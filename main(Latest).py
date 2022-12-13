@@ -1,0 +1,181 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+class AlgoTrading ():
+
+    def plotForex(data, points=None, channels=None, lines=None, take_profit_stop_loss=None, number_candles=3001, window=200, dpi=600, size=(5,3)):
+
+        start = 0
+        up_color = "Green"
+        down_color = "Red"
+
+        scope = len(data)-number_candles
+
+        # Slices the data:
+        data_original = data
+        points_original = points
+        channels_original = channels
+        lines_original = lines
+        take_profit_stop_loss_original = take_profit_stop_loss
+
+        data = data[-number_candles:]
+        data = data.reset_index(drop=True)
+
+
+        if channels is not None:
+            channels = channels[channels["X1"] > scope]
+            channels = channels.reset_index(drop=True)
+            dfChannel_reindex = channels
+            dfChannel_reindex["X1"] = dfChannel_reindex["X1"] - scope
+            dfChannel_reindex["X2"] = dfChannel_reindex["X2"] - scope
+
+        if take_profit_stop_loss is not None:
+            take_profit_stop_loss = take_profit_stop_loss[take_profit_stop_loss["X1"] > scope]
+            take_profit_stop_loss = take_profit_stop_loss.reset_index(drop=True)
+            tp_sl_reindex = take_profit_stop_loss
+            tp_sl_reindex["X1"] = tp_sl_reindex["X1"] - scope
+            tp_sl_reindex["X2"] = tp_sl_reindex["X2"] - scope
+
+        if points is not None:
+            points = points[points["X"] > scope]
+            points = points.reset_index(drop=True)
+            points["X"] = points["X"] - scope
+
+        if lines is not None:
+            lines = lines[lines["X"] > scope]
+            lines = lines.reset_index(drop=True)
+            lines["X"] = lines["X"] - scope
+
+        for end in range(start, len(data), window):
+            if end > 0:
+
+                plt.figure(figsize=size, dpi=dpi)
+
+                # Slices the data into a window:
+                data_2 = data[start:end]
+
+                if points is not None:
+                    points_bigger = points.loc[points["X"] > start]
+                    points_in_window = points_bigger.loc[points_bigger["X"] < end]
+
+                if channels is not None:
+                    channels_in_window = dfChannel_reindex[dfChannel_reindex["X2"] >= start]
+                    channels_in_window = channels_in_window[channels_in_window["X1"] < end]
+                    channels_in_window = channels_in_window.reset_index(drop=True)
+
+                if take_profit_stop_loss is not None:
+                    tp_sl_window = tp_sl_reindex[tp_sl_reindex["X2"] >= start]
+                    tp_sl_window = tp_sl_window[tp_sl_window["X1"] < end]
+                    tp_sl_window = tp_sl_window.reset_index(drop=True)
+
+                if lines is not None:
+                    lines_greater_start = lines[lines["X"]>=start]
+                    lines_in_window = lines_greater_start[lines_greater_start["X"]<end]
+
+
+                # Gets the up and down candles:
+                up = data_2.loc[data_2.Close >= data_2.Open]
+                down = data_2.loc[data_2.Close <= data_2.Open]
+
+                # plot up prices
+                plt.bar(up.index, up.Close - up.Open, 0.8, bottom=up.Open, color=up_color)
+                plt.bar(up.index, up.High - up.Close, 0.2, bottom=up.Close, color=up_color)
+                plt.bar(up.index, up.Low - up.Open, 0.2, bottom=up.Open, color=up_color)
+
+                # plot down prices
+                plt.bar(down.index, down.Close - down.Open, 0.8, bottom=down.Open, color=down_color)
+                plt.bar(down.index, down.High - down.Open, 0.2, bottom=down.Open, color=down_color)
+                plt.bar(down.index, down.Low - down.Close, 0.2, bottom=down.Close, color=down_color)
+
+                # Plots points:
+                if points is not None:
+                    for point_index in points_in_window.index:
+                        plt.plot(points_in_window["X"][point_index],points_in_window["Y"][point_index],".", color=points_in_window["Color"][point_index], zorder=-10)
+
+                # Plots channels:
+                if channels is not None:
+                    if channels_in_window is not None:
+
+                        for c_ind in channels_in_window.index:
+
+                            # If channel X1 is greater than start:
+                            if channels_in_window["X1"][c_ind] >= start:
+
+                                # If channel X2 is less than end:
+                                if channels_in_window["X2"][c_ind] <= end:
+                                    plt.plot([channels_in_window["X1"][c_ind],channels_in_window["X2"][c_ind]], [channels_in_window["Y1"][c_ind],channels_in_window["Y1"][c_ind]], color=channels_in_window["Color"][c_ind],linewidth = 0.4, zorder =-5)
+                                    plt.plot([channels_in_window["X1"][c_ind], channels_in_window["X2"][c_ind]],
+                                             [channels_in_window["Y2"][c_ind], channels_in_window["Y2"][c_ind]],
+                                             color=channels_in_window["Color"][c_ind],linewidth = 0.4, zorder=-5)
+                                else:
+                                    plt.plot([channels_in_window["X1"][c_ind], end],
+                                             [channels_in_window["Y1"][c_ind], channels_in_window["Y1"][c_ind]],
+                                             color=channels_in_window["Color"][c_ind],linewidth = 0.4, zorder=-5)
+                                    plt.plot([channels_in_window["X1"][c_ind], end],
+                                             [channels_in_window["Y2"][c_ind], channels_in_window["Y2"][c_ind]],
+                                             color=channels_in_window["Color"][c_ind],linewidth = 0.4, zorder=-5)
+                            else:
+                                # If channel X2 is less than end:
+                                if channels_in_window["X2"][c_ind] <= end:
+                                    plt.plot([start, channels_in_window["X2"][c_ind]],
+                                             [channels_in_window["Y1"][c_ind], channels_in_window["Y1"][c_ind]],
+                                             color=channels_in_window["Color"][c_ind],linewidth = 0.4, zorder=-5)
+                                    plt.plot([start, channels_in_window["X2"][c_ind]],
+                                             [channels_in_window["Y2"][c_ind], channels_in_window["Y2"][c_ind]],
+                                             color=channels_in_window["Color"][c_ind],linewidth = 0.4, zorder=-5)
+                                else:
+                                    plt.plot([start, end],
+                                             [channels_in_window["Y1"][c_ind], channels_in_window["Y1"][c_ind]],
+                                             color=channels_in_window["Color"][c_ind],linewidth = 0.4, zorder=-5)
+                                    plt.plot([start, end],
+                                             [channels_in_window["Y2"][c_ind], channels_in_window["Y2"][c_ind]],
+                                             color=channels_in_window["Color"][c_ind], linewidth = 0.4, zorder=-5)
+
+
+                if take_profit_stop_loss is not None:
+                    if tp_sl_window is not None:
+
+                        for pl_ind in tp_sl_window.index:
+
+                            # If channel X1 is greater than start:
+                            if tp_sl_window["X1"][pl_ind] >= start:
+
+                                # If channel X2 is less than end:
+                                if tp_sl_window["X2"][pl_ind] <= end:
+                                    plt.plot([tp_sl_window["X1"][pl_ind],tp_sl_window["X2"][pl_ind]], [tp_sl_window["Y1"][pl_ind],tp_sl_window["Y1"][pl_ind]], color=tp_sl_window["Color1"][pl_ind],linewidth = 0.4, zorder =-5)
+                                    plt.plot([tp_sl_window["X1"][pl_ind], tp_sl_window["X2"][pl_ind]],
+                                             [tp_sl_window["Y2"][pl_ind], tp_sl_window["Y2"][pl_ind]],
+                                             color=tp_sl_window["Color2"][pl_ind],linewidth = 0.4, zorder=-5)
+                                else:
+                                    plt.plot([tp_sl_window["X1"][pl_ind], end],
+                                             [tp_sl_window["Y1"][pl_ind], tp_sl_window["Y1"][pl_ind]],
+                                             color=tp_sl_window["Color1"][pl_ind],linewidth = 0.4, zorder=-5)
+                                    plt.plot([tp_sl_window["X1"][pl_ind], end],
+                                             [tp_sl_window["Y2"][pl_ind], tp_sl_window["Y2"][pl_ind]],
+                                             color=tp_sl_window["Color2"][pl_ind],linewidth = 0.4, zorder=-5)
+                            else:
+                                # If channel X2 is less than end:
+                                if tp_sl_window["X2"][pl_ind] <= end:
+                                    plt.plot([start, tp_sl_window["X2"][pl_ind]],
+                                             [tp_sl_window["Y1"][pl_ind], tp_sl_window["Y1"][pl_ind]],
+                                             color=tp_sl_window["Color1"][pl_ind],linewidth = 0.4, zorder=-5)
+                                    plt.plot([start, tp_sl_window["X2"][pl_ind]],
+                                             [tp_sl_window["Y2"][pl_ind], tp_sl_window["Y2"][pl_ind]],
+                                             color=tp_sl_window["Color2"][pl_ind],linewidth = 0.4, zorder=-5)
+                                else:
+                                    plt.plot([start, end],
+                                             [tp_sl_window["Y1"][pl_ind], tp_sl_window["Y1"][pl_ind]],
+                                             color=tp_sl_window["Color1"][pl_ind],linewidth = 0.4, zorder=-5)
+                                    plt.plot([start, end],
+                                             [tp_sl_window["Y2"][pl_ind], tp_sl_window["Y2"][pl_ind]],
+                                             color=tp_sl_window["Color2"][pl_ind], linewidth = 0.4, zorder=-5)
+
+
+                # Plots lines:
+                if lines is not None:
+                    plt.plot(lines_in_window["X"], lines_in_window["Y"], color=lines["Color"][0], zorder=-8)
+
+
+                start = start + window
